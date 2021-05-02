@@ -13,6 +13,7 @@ if __name__ == "__main__":
         np_gk.insert(random.random())
     for q in np.arange(0, 1, 0.05):
         print("(percentile, approx. value): ", (q, np_gk.quantile(q)))
+    print("size=", len(np_gk.S))
     print("========================================================")
     alpha = 0.001
     np_gk = GK(alpha)
@@ -20,6 +21,7 @@ if __name__ == "__main__":
         np_gk.insert(random.random())
     for q in np.arange(0, 1, 0.05):
         print("(percentile, approx. value): ", (q, np_gk.quantile(q)))
+    print("size=", len(np_gk.S))
     print("========================================================")
     alpha = 0.0001
     np_gk = GK(alpha)
@@ -27,4 +29,4 @@ if __name__ == "__main__":
         np_gk.insert(random.random())
     for q in np.arange(0, 1, 0.05):
         print("(percentile, approx. value): ", (q, np_gk.quantile(q)))
-
+    print("size=", len(np_gk.S))

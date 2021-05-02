@@ -43,7 +43,7 @@ class GK:
 
         i = len(self.S)-2
         while i >= 1:
-            if bands[self.S[i].Delta] <= bands[self.S[i].Delta]:
+            if bands[self.S[i].Delta] <= bands[self.S[i+1].Delta]:
                 start = i
                 g_i_star = self.S[i].g;
                 while start >= 2 and bands[self.S[start-1].Delta] < bands[self.S[i].Delta]:
