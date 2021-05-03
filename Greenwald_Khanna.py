@@ -32,8 +32,37 @@ class GK:
             rmax = rmin + self.S[i].Delta
             if max(r-rmin, rmax-r) <= self.alpha * self.n:
                 print(self.alpha * self.n, r-rmin, rmax-r)
-                return self.S[i].v
+                return (i, self.S[i].v)
         return None
+
+    def dp_exp_mech_quantile(self, phi, eps):
+        eps = float(eps)
+        r = math.ceil(phi*self.n)
+        res_index, res = self.quantile(phi)
+
+        max_value = -np.inf
+        max_index = -1
+        for i in range(1, len(self.S)):
+            score = math.log(self.S[i].g, 2) - eps/2 * math.ceil(abs(i-res_index))
+            n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+            if n_score > max_value:
+                max_index = i
+                max_value = n_score
+
+        return np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v)
+
+    def dp_histogram_quantile(self, phi, eps):
+        eps = float(eps)
+        hist = []
+        cur = 0
+        for t in self.S:
+            noisy_g = t.g + np.random.laplace(0., 2/eps)
+            hist.append((t.v, cur + noisy_g))
+            cur = cur + noisy_g
+        r = math.ceil(phi*self.n)
+        for (v, rank) in hist:
+            if r < rank: return v
+        return hist[len(hist)-1][0]
 
     def __compress(self):
         if self.n < 1/(2*self.alpha): return
