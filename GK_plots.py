@@ -26,15 +26,49 @@ def GK_plot(alpha, n, streams, labels):
             values.append(res)
         vs.append(np.array(values))
     for i in range(len(labels)):
-        plt.plot(qs, vs[i], label=labels[i])
-    plt.xlabel(r"Value")
+        plt.plot(vs[i], qs, label=labels[i])
     plt.ylabel(r"Percentile")
-    plt.ylim(0, 1)
+    plt.xlabel(r"Value")
     plt.legend()
     plt.savefig("images/gk_{0}_{1}_{2}.png".format(alpha, n, '_'.join(labels)))
     plt.gcf().clear()
 
+def DP_GK_plot(alpha, n, eps, streams, labels, num_trials):
+    eps = float(eps)
+
+    np_gks = []
+    for i in range(len(labels)):
+        np_gks.append(GK(alpha))
+        for item in streams[i]:
+            np_gks[i].insert(item)
+    qs = np.arange(0, 1, 0.05)
+    vs = []
+    for i in range(len(labels)):
+        values = [[], []]
+        for q in np.arange(0, 1, 0.05):
+            res_index, res = np_gks[i].quantile(q)
+            diff1 = 0
+            diff2 = 0
+            for j in range(num_trials):
+                res1 = np_gks[i].dp_exp_mech_quantile(q, eps)
+                diff1 += abs(res1-res)
+                res2 = np_gks[i].dp_histogram_quantile(q, eps)
+                diff2 += abs(res2-res)
+            values[0].append(diff1/num_trials)
+            values[1].append(diff2/num_trials)
+        vs.append(np.array(values))
+    for i in range(len(labels)):
+        plt.plot(qs, vs[i][0], label="Exp"+labels[i])
+        plt.plot(qs, vs[i][1], label="Hist"+labels[i])
+    plt.ylabel(r"Absolute Error")
+    plt.xlabel(r"Percentile")
+    plt.legend()
+    plt.savefig("images/p_gk_{0}_{1}_{2}.png".format(alpha, n, '_'.join(labels)))
+    print("Saving images/p_gk_{0}_{1}_{2}.png".format(alpha, n, '_'.join(labels)))
+    plt.gcf().clear()
+
 if __name__ == "__main__":
+    '''
     np_gk = GK(0.01)
     for item in np.random.uniform(0, 1, 10000):
         np_gk.insert(item)
@@ -67,5 +101,5 @@ if __name__ == "__main__":
             unif_data = np.random.uniform(0, 1, num_items)
             normal_data = np.random.normal(0.5, 1/12., num_items)
             GK_plot(a, num_items, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"])
-    '''
+            #DP_GK_plot(a, num_items, 1, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"], 1000)
     

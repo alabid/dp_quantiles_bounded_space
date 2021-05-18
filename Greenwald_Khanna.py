@@ -24,21 +24,24 @@ class GK:
         self.__internal_insert(v)
         self.n += 1
 
-    def quantile(self, phi):
-        r = math.ceil(phi*self.n)
+    def quantile(self, q):
+        r = math.ceil(q*self.n)
+
+        if q == 0 and len(self.S) > 0: return (0, self.S[0].v)
+
         rmin = 0
         for i in range(len(self.S)):
             rmin += self.S[i].g
             rmax = rmin + self.S[i].Delta
             if max(r-rmin, rmax-r) <= self.alpha * self.n:
-                print(self.alpha * self.n, r-rmin, rmax-r)
                 return (i, self.S[i].v)
+        print("Couldn't find element for quantile ", q, " and rank ", r)
         return None
 
-    def dp_exp_mech_quantile(self, phi, eps):
+    def dp_exp_mech_quantile(self, q, eps):
         eps = float(eps)
-        r = math.ceil(phi*self.n)
-        res_index, res = self.quantile(phi)
+        r = math.ceil(q*self.n)
+        res_index, res = self.quantile(q)
 
         max_value = -np.inf
         max_index = -1
@@ -51,15 +54,18 @@ class GK:
 
         return np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v)
 
-    def dp_histogram_quantile(self, phi, eps):
+    def construct_histogram(self):
+        return []
+
+    def dp_histogram_quantile(self, q, eps):
         eps = float(eps)
-        hist = []
+        hist = self.construct_histogram()
         cur = 0
         for t in self.S:
             noisy_g = t.g + np.random.laplace(0., 2/eps)
             hist.append((t.v, cur + noisy_g))
             cur = cur + noisy_g
-        r = math.ceil(phi*self.n)
+        r = math.ceil(q*self.n)
         for (v, rank) in hist:
             if r < rank: return v
         return hist[len(hist)-1][0]
@@ -93,7 +99,7 @@ class GK:
         # determine Delta
         Delta = 0
         if self.n >= int(1/(2*self.alpha)) and i > 0 and i < len(self.S):
-            Delta = math.floor(2*self.alpha*self.n)-1
+            Delta = math.floor(2*self.alpha*self.n)
         
         # form Tuple and add to storage
         self.S = self.S[:i] + [GKTuple(v, 1, Delta)] + self.S[i:]
