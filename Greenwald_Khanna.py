@@ -54,21 +54,61 @@ class GK:
 
         return np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v)
 
-    def construct_histogram(self):
-        return []
+    def construct_histogram(self, l, bin_size, num_bins):
+        hist = {}
+        for i in range(num_bins):
+            hist[(l+i*bin_size, l+(i+1)*bin_size)] = 0
+        return hist
 
-    def dp_histogram_quantile(self, q, eps):
+    def dp_histogram_quantile_pure(self, q, eps, l, bin_size, num_bins):
+        num_bins = int(num_bins)
         eps = float(eps)
-        hist = self.construct_histogram()
+        hist = self.construct_histogram(l, bin_size, num_bins)
+        assert(len(hist.keys()) <= 100*math.log(self.n)*len(self.S))
+        for t in self.S:
+            (v, g, Delta) = (t.v, t.g, t.Delta)
+            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
+            noisy_g = g + np.random.laplace(0., 2.0/eps)
+            hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = noisy_g
+        cdf = {}
         cur = 0
         for t in self.S:
-            noisy_g = t.g + np.random.laplace(0., 2/eps)
-            hist.append((t.v, cur + noisy_g))
+            (v, g, Delta) = (t.v, t.g, t.Delta)
+            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
+            noisy_g = hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)]
             cur = cur + noisy_g
+            cdf[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = cur
         r = math.ceil(q*self.n)
-        for (v, rank) in hist:
-            if r < rank: return v
-        return hist[len(hist)-1][0]
+        for (l, r) in cdf:
+            rank = cdf[(l, r)]
+            if r < rank: return l
+        return cdf[len(cdf)-1][0]
+
+    def dp_histogram_quantile_approx(self, q, eps, delta, l, bin_size, num_bins):
+        num_bins = int(num_bins)
+        eps = float(eps)
+        hist = self.construct_histogram(l, bin_size, num_bins)
+        assert(len(hist.keys()) <= 100*math.log(self.n)*len(self.S))
+        for t in self.S:
+            (v, g, Delta) = (t.v, t.g, t.Delta)
+            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
+            noisy_g = g + np.random.laplace(0., 2.0/eps)
+            if noisy_g < (2*math.log(2.0/delta)/eps + 1.0):
+                noisy_g = 0
+            hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = noisy_g
+        cdf = {}
+        cur = 0
+        for t in self.S:
+            (v, g, Delta) = (t.v, t.g, t.Delta)
+            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
+            noisy_g = hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)]
+            cur = cur + noisy_g
+            cdf[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = cur
+        r = math.ceil(q*self.n)
+        for (l, r) in cdf:
+            rank = cdf[(l, r)]
+            if r < rank: return l
+        return cdf[len(cdf)-1][0]
 
     def __compress(self):
         if self.n < 1/(2*self.alpha): return

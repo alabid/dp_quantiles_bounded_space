@@ -35,6 +35,8 @@ def GK_plot(alpha, n, streams, labels):
 
 def DP_GK_plot(alpha, n, eps, streams, labels, num_trials):
     eps = float(eps)
+    delta = math.pow(10, -3)
+    delta = float(delta)
 
     np_gks = []
     for i in range(len(labels)):
@@ -52,7 +54,11 @@ def DP_GK_plot(alpha, n, eps, streams, labels, num_trials):
             for j in range(num_trials):
                 res1 = np_gks[i].dp_exp_mech_quantile(q, eps)
                 diff1 += abs(res1-res)
-                res2 = np_gks[i].dp_histogram_quantile(q, eps)
+                res2 = 0
+                if delta == 0:
+                    res2 = np_gks[i].dp_histogram_quantile_pure(q, eps, 0, alpha/2, 1/(2*0.05))
+                else:
+                    res2 = np_gks[i].dp_histogram_quantile_approx(q, eps, delta, 0, alpha/2, 1/(2*0.05))
                 diff2 += abs(res2-res)
             values[0].append(diff1/num_trials)
             values[1].append(diff2/num_trials)
@@ -97,9 +103,10 @@ if __name__ == "__main__":
     print(res_real, np_gk.dp_histogram_quantile(0.5, 1))
     '''
     for a in [0.1, 0.01, 0.001, 0.0001]:
-        for num_items in [1000, 10000, 100000, 100000]:
+        #for num_items in [1000, 10000, 100000, 100000]:
+        for num_items in [100000]:
             unif_data = np.random.uniform(0, 1, num_items)
             normal_data = np.random.normal(0.5, 1/12., num_items)
-            GK_plot(a, num_items, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"])
-            #DP_GK_plot(a, num_items, 1, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"], 1000)
+            # GK_plot(a, num_items, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"])
+            DP_GK_plot(a, num_items, 1, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"], 1000)
     
