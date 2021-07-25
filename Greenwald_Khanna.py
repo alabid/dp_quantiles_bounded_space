@@ -38,7 +38,7 @@ class GK:
         print("Couldn't find element for quantile ", q, " and rank ", r)
         return None
 
-    def dp_exp_mech_quantile(self, q, eps):
+    def dp_exp(self, q, eps):
         eps = float(eps)
         r = math.ceil(q*self.n)
         res_index, res = self.quantile(q)
@@ -60,7 +60,8 @@ class GK:
             hist[(l+i*bin_size, l+(i+1)*bin_size)] = 0
         return hist
 
-    def dp_histogram_quantile_pure(self, q, eps, l, bin_size, num_bins):
+    def dp_hist(self, q, eps):
+        l, bin_size, num_bins = 0, 0.1, 10
         num_bins = int(num_bins)
         eps = float(eps)
         hist = self.construct_histogram(l, bin_size, num_bins)
@@ -68,33 +69,7 @@ class GK:
         for t in self.S:
             (v, g, Delta) = (t.v, t.g, t.Delta)
             bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
-            noisy_g = g + np.random.laplace(0., 2.0/eps)
-            hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = noisy_g
-        cdf = {}
-        cur = 0
-        for t in self.S:
-            (v, g, Delta) = (t.v, t.g, t.Delta)
-            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
-            noisy_g = hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)]
-            cur = cur + noisy_g
-            cdf[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = cur
-        r = math.ceil(q*self.n)
-        for (l, r) in cdf:
-            rank = cdf[(l, r)]
-            if r < rank: return l
-        return cdf[len(cdf)-1][0]
-
-    def dp_histogram_quantile_approx(self, q, eps, delta, l, bin_size, num_bins):
-        num_bins = int(num_bins)
-        eps = float(eps)
-        hist = self.construct_histogram(l, bin_size, num_bins)
-        assert(len(hist.keys()) <= 100*math.log(self.n)*len(self.S))
-        for t in self.S:
-            (v, g, Delta) = (t.v, t.g, t.Delta)
-            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
-            noisy_g = g + np.random.laplace(0., 2.0/eps)
-            if noisy_g < (2*math.log(2.0/delta)/eps + 1.0):
-                noisy_g = 0
+            noisy_g = max(0, g + np.random.laplace(0., 2.0/eps))
             hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = noisy_g
         cdf = {}
         cur = 0

@@ -35,8 +35,6 @@ def GK_plot(alpha, n, streams, labels):
 
 def DP_GK_plot(alpha, n, eps, streams, labels, num_trials):
     eps = float(eps)
-    delta = math.pow(10, -3)
-    delta = float(delta)
 
     np_gks = []
     for i in range(len(labels)):
@@ -52,13 +50,10 @@ def DP_GK_plot(alpha, n, eps, streams, labels, num_trials):
             diff1 = 0
             diff2 = 0
             for j in range(num_trials):
-                res1 = np_gks[i].dp_exp_mech_quantile(q, eps)
+                res1 = np_gks[i].dp_exp(q, eps)
                 diff1 += abs(res1-res)
                 res2 = 0
-                if delta == 0:
-                    res2 = np_gks[i].dp_histogram_quantile_pure(q, eps, 0, alpha/2, 1/(2*0.05))
-                else:
-                    res2 = np_gks[i].dp_histogram_quantile_approx(q, eps, delta, 0, alpha/2, 1/(2*0.05))
+                res2 = np_gks[i].dp_hist(q, eps, 0, alpha/2, 1/(2*0.05))
                 diff2 += abs(res2-res)
             values[0].append(diff1/num_trials)
             values[1].append(diff2/num_trials)
@@ -74,39 +69,95 @@ def DP_GK_plot(alpha, n, eps, streams, labels, num_trials):
     plt.gcf().clear()
 
 if __name__ == "__main__":
-    '''
-    np_gk = GK(0.01)
-    for item in np.random.uniform(0, 1, 10000):
-        np_gk.insert(item)
-    res_real = np_gk.quantile(0.5)
-    res_dp = np_gk.dp_exp_mech_quantile(0.5, 10)
-    print(res_real, res_dp)
-    res_real = np_gk.quantile(0.2)
-    res_dp = np_gk.dp_exp_mech_quantile(0.2, 10)
-    print(res_real, res_dp)
-    res_dp = np_gk.dp_exp_mech_quantile(0.2, 1)
-    print(res_real, res_dp)
-    res_dp = np_gk.dp_exp_mech_quantile(0.2, 0.0001)
-    print(res_real, res_dp)
 
-    grad = 0.001
-    np_gk = GK(0.01)
-    for item in np.random.uniform(0, 1, 10000):
-        np_gk.insert(math.floor(item*1/grad)*grad)
-    res_real = np_gk.quantile(0.2)
-    res_dp = np_gk.dp_exp_mech_quantile(0.2, 1)
-    print(res_real, res_dp)
-    print(res_real, np_gk.dp_histogram_quantile(0.2, 1))
-    res_real = np_gk.quantile(0.5)
-    res_dp = np_gk.dp_exp_mech_quantile(0.5, 1)
-    print(res_real, res_dp)
-    print(res_real, np_gk.dp_histogram_quantile(0.5, 1))
+    ### Vary n for DPExpGKGumb and DPHistGK
+    num_trials = 1000
+    labels = [r"Unif(0,1)", r"Normal(0.5,1/12)"]
+    ## Vary n for large alpha
+    a = 0.1
+    eps = 1
+    xs = [100, 1000, 10000, 100000]
+    ys_exp = [[], []]
+    ys_hist = [[], []]
+    full_ys_exp = [[], []]
+    full_ys_hist = [[], []]
+    q = 0.5
+    for num_items in xs:
+        print("n = ", num_items)
+        unif_data = np.random.uniform(0, 1, num_items)
+        normal_data = np.random.normal(0.5, math.sqrt(1/12.), num_items)
+
+        np_gk_unif = GK(a)
+        full_np_gk_unif = GK(1.0/num_items)
+        for item in np.random.uniform(0, 1, num_items):
+            np_gk_unif.insert(item)
+            full_np_gk_unif.insert(item)
+        np_gk_normal = GK(a)
+        full_np_gk_normal = GK(1.0/num_items)
+        for item in np.random.normal(0.5, math.sqrt(1/12.), num_items):
+            np_gk_normal.insert(item)
+            full_np_gk_normal.insert(item)
+
+        res_index, res_unif = np_gk_unif.quantile(q)
+        res_index, res_normal = np_gk_normal.quantile(q)
+        res_index, full_res_unif = full_np_gk_unif.quantile(q)
+        res_index, full_res_normal = np_gk_normal.quantile(q)
+
+        diff_unif_exp = 0
+        diff_normal_exp = 0
+        diff_full_unif_exp = 0
+        diff_full_normal_exp = 0
+        diff_unif_hist = 0
+        diff_normal_hist = 0
+        diff_full_unif_hist = 0
+        diff_full_normal_hist = 0
+
+        for j in range(num_trials):
+            # Exponential Mechanism
+            diff_unif_exp += abs(res_unif - np_gk_unif.dp_exp(q, eps))
+            diff_normal_exp += abs(res_unif - np_gk_normal.dp_exp(q, eps))
+            diff_full_unif_exp += abs(full_res_unif - full_np_gk_unif.dp_exp(q, eps))
+            diff_full_normal_exp += abs(full_res_unif - full_np_gk_normal.dp_exp(q, eps))
+
+            # Histogram
+            diff_unif_hist += abs(res_unif - np_gk_unif.dp_hist(q, eps))
+            diff_normal_hist += abs(res_unif - np_gk_normal.dp_hist(q, eps))
+            diff_full_unif_hist += abs(full_res_unif - full_np_gk_unif.dp_hist(q, eps))
+            diff_full_normal_hist += abs(full_res_unif - full_np_gk_normal.dp_hist(q, eps))
+
+        ys_exp[0].append(diff_unif_exp/num_trials)
+        ys_exp[1].append(diff_normal_exp/num_trials)
+        full_ys_exp[0].append(diff_full_unif_exp/num_trials)
+        full_ys_exp[1].append(diff_full_normal_exp/num_trials)
+        ys_hist[0].append(diff_unif_hist/num_trials)
+        ys_hist[1].append(diff_normal_hist/num_trials)
+        full_ys_hist[0].append(diff_full_unif_hist/num_trials)
+        full_ys_hist[1].append(diff_full_normal_hist/num_trials)
+    # DPExpGKGump: vary n for large alpha
+    bar_width = 0.25
+    pos1 = np.arange(len(ys_exp[0]))
+    pos2 = [x + bar_width for x in pos1]
+
+    plt.bar(pos1, ys_exp[0], color='r', width=bar_width, label=labels[0])
+    plt.bar(pos2, ys_exp[1], color='g', width=bar_width, label=labels[1])
+    plt.xlabel(r"Dataset/Stream Size ($n$)", fontsize=25, fontweight="bold")
+    plt.ylabel(r"Absolute Error", fontsize=25, fontweight="bold")
+    plt.legend()
+    plt.show()
+    plt.savefig("new_images/dp_gk_{0}_{1}_{2}.png".format(alpha, eps, q))
+    plt.gcf().clear()
     '''
-    for a in [0.1, 0.01, 0.001, 0.0001]:
-        #for num_items in [1000, 10000, 100000, 100000]:
-        for num_items in [100000]:
-            unif_data = np.random.uniform(0, 1, num_items)
-            normal_data = np.random.normal(0.5, 1/12., num_items)
-            # GK_plot(a, num_items, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"])
-            DP_GK_plot(a, num_items, 1, [unif_data, normal_data], [r"Unif(0,1)", r"Normal(0.5,0.0833)"], 1000)
+    ## Vary n for DPExpGKGumb and DPHistGK
+    a = 0.0001
+    eps = 1
+    xs = [10000, 100000, 1000000, 10000000]
+    ys = []
+    np_gks = []
+    for num_items in xs:
+        unif_data = np.random.uniform(0, 1, num_items)
+        normal_data = np.random.normal(0.5, math.sqrt(1/12.), num_items)
+        np_gks.append(GK(alpha))
+        for item in streams[i]:
+            np_gks[i].insert(item)
+    '''
     
