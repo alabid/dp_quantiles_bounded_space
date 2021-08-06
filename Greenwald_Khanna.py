@@ -2,9 +2,42 @@
 
 import numpy as np
 import math
+import bisect 
 
 # defined constants
 MAX_BAND = 1000000000
+
+class FullSpace:
+    def __init__(self):
+        self.n = 0
+        self.S = []
+
+    def insert(self, v):
+        bisect.insort(self.S, v)
+        self.n += 1
+
+    def quantile(self, q):
+        index = math.floor(self.n*q)
+        return index, self.S[index]
+
+    def dp_exp(self, q, eps):
+        eps = float(eps)
+        r = math.ceil(q*self.n)
+        res_index, res = self.quantile(q)
+
+        max_value = -np.inf
+        max_index = -1
+        for i in range(1, len(self.S)):
+            score = -np.inf
+            if self.S[i]-self.S[i-1] > 0:
+                score = math.log(self.S[i]-self.S[i-1], 2) - eps/2 * math.ceil(abs(i-res_index))
+            n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+            if n_score > max_value:
+                max_index = i
+                max_value = n_score
+
+        return np.random.uniform(low=self.S[max_index-1], high=self.S[max_index])
+
 
 class GKTuple:
     def __init__(self, v, g, Delta):
@@ -34,7 +67,7 @@ class GK:
             rmin += self.S[i].g
             rmax = rmin + self.S[i].Delta
             if max(r-rmin, rmax-r) <= self.alpha * self.n:
-                return (i, self.S[i].v)
+                return (rmin, self.S[i].v)
         print("Couldn't find element for quantile ", q, " and rank ", r)
         return None
 
@@ -45,45 +78,20 @@ class GK:
 
         max_value = -np.inf
         max_index = -1
+        rmin = 0
         for i in range(1, len(self.S)):
-            score = math.log(self.S[i].g, 2) - eps/2 * math.ceil(abs(i-res_index))
+            rmin += self.S[i].g
+            rmax = rmin + self.S[i].Delta
+
+            score = -np.inf
+            u = -min(abs(rmin-r), abs(rmax-r))
+            score = math.log(self.S[i].v-self.S[i-1].v, 2) + eps/2*u
             n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
             if n_score > max_value:
                 max_index = i
                 max_value = n_score
 
         return np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v)
-
-    def construct_histogram(self, l, bin_size, num_bins):
-        hist = {}
-        for i in range(num_bins):
-            hist[(l+i*bin_size, l+(i+1)*bin_size)] = 0
-        return hist
-
-    def dp_hist(self, q, eps):
-        l, bin_size, num_bins = 0, 0.1, 10
-        num_bins = int(num_bins)
-        eps = float(eps)
-        hist = self.construct_histogram(l, bin_size, num_bins)
-        assert(len(hist.keys()) <= 100*math.log(self.n)*len(self.S))
-        for t in self.S:
-            (v, g, Delta) = (t.v, t.g, t.Delta)
-            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
-            noisy_g = max(0, g + np.random.laplace(0., 2.0/eps))
-            hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = noisy_g
-        cdf = {}
-        cur = 0
-        for t in self.S:
-            (v, g, Delta) = (t.v, t.g, t.Delta)
-            bin_num = math.floor((v-l)/float(bin_size)) if v >= l else 0
-            noisy_g = hist[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)]
-            cur = cur + noisy_g
-            cdf[(l + bin_num*bin_size, l + (bin_num+1)*bin_size)] = cur
-        r = math.ceil(q*self.n)
-        for (l, r) in cdf:
-            rank = cdf[(l, r)]
-            if r < rank: return l
-        return cdf[len(cdf)-1][0]
 
     def __compress(self):
         if self.n < 1/(2*self.alpha): return
@@ -117,8 +125,9 @@ class GK:
             Delta = math.floor(2*self.alpha*self.n)
         
         # form Tuple and add to storage
-        self.S = self.S[:i] + [GKTuple(v, 1, Delta)] + self.S[i:]
-            
+        self.S.insert(i, GKTuple(v, 1, Delta))
+        #self.S = self.S[:i] + [] + self.S[i:]
+
     @staticmethod
     def __band_lookup_table(max_Delta):
         bands = [None]*(max_Delta+1)
