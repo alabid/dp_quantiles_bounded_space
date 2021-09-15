@@ -2,7 +2,7 @@
 
 import numpy as np
 import math
-import bisect 
+import bisect
 
 # defined constants
 MAX_BAND = 1000000000
@@ -23,20 +23,55 @@ class FullSpace:
     def dp_exp(self, q, eps):
         eps = float(eps)
         r = math.ceil(q*self.n)
-        res_index, res = self.quantile(q)
+        #res_index, res = self.quantile(q)
 
         max_value = -np.inf
         max_index = -1
+        rmin = 0
+
+        #run exp_mech_gumb iterate on tuple element 0 which is always rank 0 element
+        u = - abs(0-r)
+        score = (eps/2)*u
+        n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+        max_index = 0
+        max_value = n_score
+
         for i in range(1, len(self.S)):
-            score = -np.inf
+            #run exp_mech_gumb iterate on interval between i-1 and i
+
             if self.S[i]-self.S[i-1] > 0:
-                score = math.log(self.S[i]-self.S[i-1], 2) - eps/2 * math.ceil(abs(i-res_index))
+                if r>i:
+                    u = -abs(r-i)
+                else:
+                    u = -abs(r-(i-1))
+                score = math.log(1E8*(self.S[i]-self.S[i-1]), 2) + (eps/2)*u
+                n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+                if n_score > max_value:
+                    max_index = i
+                    max_value = n_score
+                    interval = True
+
+            #run exp_mech_gumb iterate on tuple element i
+            u = -abs(i-r)
+            score = eps/2*u
             n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
             if n_score > max_value:
                 max_index = i
                 max_value = n_score
+                interval = False
 
-        return np.random.uniform(low=self.S[max_index-1], high=self.S[max_index])
+        if interval == True:
+            return np.random.uniform(low=self.S[max_index-1], high=self.S[max_index])
+        else:
+            return self.S[max_index]
+
+    def __getstate__(self):
+        return [self.n, self.S]
+
+    def __setstate__(self, state):
+        self.n = state[0]
+        self.S = state[1]
+
 
 
 class GKTuple:
@@ -44,6 +79,14 @@ class GKTuple:
         self.v = v
         self.g = g
         self.Delta = Delta
+
+    def __getstate__(self):
+        return [self.v, self.g, self.Delta]
+
+    def __setstate__(self, state):
+        self.v = state[0]
+        self.g = state[1]
+        self.Delta = state[2]
 
 class GK:
     def __init__(self, alpha):
@@ -79,19 +122,86 @@ class GK:
         max_value = -np.inf
         max_index = -1
         rmin = 0
-        for i in range(1, len(self.S)):
-            rmin += self.S[i].g
-            rmax = rmin + self.S[i].Delta
+        interval = False
 
-            score = -np.inf
+        #run exp_mech_gumb iterate on tuple element 0 which is always rank 0 element
+        u = - abs(0-r)
+        score = (eps/2)*u
+        n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+        max_index = 0
+        max_value = n_score
+
+        for i in range(1, len(self.S)):
+            #run exp_mech_gumb iterate on interval between i-1 and i
+            rmax = rmin + self.S[i].g + self.S[i].Delta
+
+            if self.S[i].v-self.S[i-1].v > 0:
+                u = -min(abs(rmin-r), abs(rmax-r))
+                score = math.log(1E8*(self.S[i].v-self.S[i-1].v), 2) + (eps/2)*u
+                n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+                if n_score > max_value:
+                    max_index = i
+                    max_value = n_score
+                    interval = True
+
+            #run exp_mech_gumb iterate on tuple element i
+            rmin += self.S[i].g
+            u = -min(abs(rmin-r), abs(rmax-r))
+            score = eps/2*u
+            n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+            if n_score > max_value:
+                max_index = i
+                max_value = n_score
+                interval = False
+
+        if interval == True:
+            return np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v)
+        else:
+            return self.S[max_index].v
+
+    def dp_exp_ind(self, q, eps):
+        eps = float(eps)
+        r = math.ceil(q*self.n)
+        res_index, res = self.quantile(q)
+
+        max_value = -np.inf
+        max_index = -1
+        rmin = 0
+        interval = False
+
+        #run exp_mech_gumb iterate on tuple element 0 which is always rank 0 element
+        u = - abs(0-r)
+        score = eps/2*u
+        n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+        max_index = 0
+        max_value = n_score
+
+        for i in range(1, len(self.S)):
+            #run exp_mech_gumb iterate on interval between i-1 and i
+            rmax = rmin + self.S[i].g + self.S[i].Delta
+
             u = -min(abs(rmin-r), abs(rmax-r))
             score = math.log(self.S[i].v-self.S[i-1].v, 2) + eps/2*u
             n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
             if n_score > max_value:
                 max_index = i
                 max_value = n_score
+                interval = True
 
-        return np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v)
+            #run exp_mech_gumb iterate on tuple element i
+            rmin += self.S[i].g
+            u = -min(abs(rmin-r), abs(rmax-r))
+            score = eps/2*u
+            n_score = score + np.random.gumbel(loc=0.0, scale=1.0)
+            if n_score > max_value:
+                max_index = i
+                max_value = n_score
+                interval = False
+
+        if interval == True:
+            return [np.random.uniform(low=self.S[max_index-1].v, high=self.S[max_index].v), max_index]
+        else:
+            return [self.S[max_index].v, max_index]
 
     def __compress(self):
         if self.n < 1/(2*self.alpha): return
@@ -123,10 +233,17 @@ class GK:
         Delta = 0
         if self.n >= int(1/(2*self.alpha)) and i > 0 and i < len(self.S):
             Delta = math.floor(2*self.alpha*self.n)
-        
+
         # form Tuple and add to storage
         self.S.insert(i, GKTuple(v, 1, Delta))
         #self.S = self.S[:i] + [] + self.S[i:]
+
+    def __getstate__(self):
+        return [self.n, self.S]
+
+    def __setstate__(self, state):
+        self.n = state[0]
+        self.S = state[1]
 
     @staticmethod
     def __band_lookup_table(max_Delta):
@@ -150,5 +267,3 @@ class GK:
             tau += 1
 
         return bands
-
-    
