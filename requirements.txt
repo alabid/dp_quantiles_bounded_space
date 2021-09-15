@@ -1,0 +1,4 @@
+## General packages
+tqdm
+statistics
+numpy
