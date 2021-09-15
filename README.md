@@ -15,6 +15,9 @@ suited to the multiple quantiles case.
 We implement our algorithms
 and experimentally evaluate them on synthetic and real-world datasets. 
 
+For demonstration purposes, we only include the python files for generating the synthetic datasets and
+the algorithm based on the exponential mechanism.
+
 Install required packages via
 ```
 pip3 install -r requirements.txt
